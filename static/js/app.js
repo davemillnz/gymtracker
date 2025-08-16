@@ -169,7 +169,7 @@ class GymTracker {
         if (!this.currentFile) return;
 
         const exercise = document.getElementById('exerciseSelect').value;
-        const use1rm = document.querySelector('input[name="analysisMode"]:checked').value === '1rm';
+        const analysisMode = document.querySelector('input[name="analysisMode"]:checked').value;
 
         if (!exercise) {
             this.showError('Please select an exercise.');
@@ -182,7 +182,7 @@ class GymTracker {
             const formData = new FormData();
             formData.append('file', this.currentFile);
             formData.append('exercise', exercise);
-            formData.append('use_1rm', use1rm);
+            formData.append('analysis_mode', analysisMode);
 
             const response = await fetch('/api/analyze', {
                 method: 'POST',
@@ -207,6 +207,14 @@ class GymTracker {
         const resultsSection = document.getElementById('resultsSection');
         const graphContainer = document.getElementById('graphContainer');
 
+        // Get analysis mode display name
+        const modeNames = {
+            'weight': 'Best Set (weight)',
+            '1rm': '1RM Estimate',
+            'volume': 'Best Set (volume)'
+        };
+        const modeName = modeNames[data.data.analysis_mode] || data.data.analysis_mode;
+
         // Display the graph image
         graphContainer.innerHTML = `
             <div class="graph-container">
@@ -215,7 +223,7 @@ class GymTracker {
                      alt="Exercise Progress Graph" 
                      class="max-w-full h-auto mx-auto">
                 <div class="mt-4 text-sm text-gray-600">
-                    <p>Analysis Mode: ${data.data.use_1rm ? '1RM Estimate' : 'Best Set'}</p>
+                    <p>Analysis Mode: ${modeName}</p>
                     <p>Data Points: ${data.data.dates.length}</p>
                 </div>
             </div>

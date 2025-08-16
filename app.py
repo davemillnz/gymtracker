@@ -59,17 +59,24 @@ def running_best(series):
         out.append(current)
     return out
 
-def generate_graph_data(best, exercise_name, use_1rm=False):
+def generate_graph_data(best, exercise_name, analysis_mode='weight'):
     """Generate graph data and create matplotlib plot."""
-    # Compute value column (weight or 1RM)
-    if use_1rm:
+    # Compute value column based on analysis mode
+    if analysis_mode == '1rm':
         best["Value"] = best.apply(lambda r: estimate_1rm(r["Weight"], r["Reps"]), axis=1)
         y_label = "1RM (kg, est.)"
         line_label = "Session 1RM (est.)"
-    else:
+        title_suffix = " (1RM est.)"
+    elif analysis_mode == 'volume':
+        best["Value"] = best.apply(lambda r: r["Weight"] * r["Reps"], axis=1)
+        y_label = "Volume (kg × reps)"
+        line_label = "Session best volume"
+        title_suffix = " (Volume)"
+    else:  # Default to weight mode
         best["Value"] = best["Weight"].astype(float)
         y_label = "Weight (kg)"
         line_label = "Session best weight"
+        title_suffix = ""
 
     # Running PR line (never down)
     best["BestSoFar"] = running_best(best["Value"].tolist())
@@ -85,7 +92,7 @@ def generate_graph_data(best, exercise_name, use_1rm=False):
     plt.plot(dates, pr_line, linestyle="--", label="All-time best so far")
     plt.fill_between(dates, pr_line, alpha=0.2)
 
-    title = f"Best {exercise_name} per Session" + (" (1RM est.)" if use_1rm else "")
+    title = f"Best {exercise_name} per Session{title_suffix}"
     plt.title(title)
     plt.ylabel(y_label)
     plt.xlabel("Date")
@@ -107,7 +114,7 @@ def generate_graph_data(best, exercise_name, use_1rm=False):
             "values": values,
             "pr_line": pr_line,
             "exercise": exercise_name,
-            "use_1rm": use_1rm
+            "analysis_mode": analysis_mode
         }
     }
 
@@ -236,10 +243,15 @@ def analyze_exercise():
         
         file = request.files['file']
         exercise_name = request.form.get('exercise', '')
-        use_1rm = request.form.get('use_1rm', 'false').lower() == 'true'
+        analysis_mode = request.form.get('analysis_mode', 'weight')
         
         if not exercise_name:
             return jsonify({"error": "Exercise name is required"}), 400
+
+        # Validate analysis mode
+        valid_modes = ['weight', '1rm', 'volume']
+        if analysis_mode not in valid_modes:
+            return jsonify({"error": f"Invalid analysis mode. Must be one of: {', '.join(valid_modes)}"}), 400
 
         # Read CSV
         df = pd.read_csv(file)
@@ -266,7 +278,7 @@ def analyze_exercise():
         best = best_set_per_day(df_ex)
         
         # Generate graph data
-        result = generate_graph_data(best, chosen_exercise, use_1rm)
+        result = generate_graph_data(best, chosen_exercise, analysis_mode)
         
         return jsonify(result)
         
