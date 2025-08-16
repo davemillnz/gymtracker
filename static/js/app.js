@@ -13,8 +13,12 @@ class GymTracker {
     }
 
     setupEventListeners() {
-        // File input change
+        // File input change for both mobile and desktop
         document.getElementById('fileInput').addEventListener('change', (e) => {
+            this.handleFileSelect(e.target.files[0]);
+        });
+        
+        document.getElementById('fileInputMobile').addEventListener('change', (e) => {
             this.handleFileSelect(e.target.files[0]);
         });
 
@@ -33,34 +37,45 @@ class GymTracker {
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
 
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
+        // Only set up drag and drop on desktop devices
+        if (!this.isMobileDevice()) {
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
 
-        dropZone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-        });
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+            });
 
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                this.handleFileSelect(files[0]);
-            }
-        });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    this.handleFileSelect(files[0]);
+                }
+            });
 
-        // Click to upload
-        dropZone.addEventListener('click', () => {
-            fileInput.click();
-        });
+            // Click to upload (desktop only)
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+        }
+    }
+
+    isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+               (window.innerWidth <= 768);
     }
 
     async handleFileSelect(file) {
         if (!file) return;
+
+        // Clear any previous error messages
+        this.hideError();
 
         if (!file.name.endsWith('.csv')) {
             this.showError('Please select a CSV file.');
@@ -92,6 +107,11 @@ class GymTracker {
                 this.showFileInfo(data);
                 this.showExerciseSection();
                 this.hideLoading();
+                
+                // Show success message for mobile users
+                if (this.isMobileDevice()) {
+                    this.showSuccess(`File uploaded successfully! Found ${data.exercises.length} exercises.`);
+                }
             } else {
                 throw new Error(data.error || 'Failed to process file');
             }
@@ -242,6 +262,24 @@ class GymTracker {
         setTimeout(() => {
             error.remove();
         }, 5000);
+    }
+
+    showSuccess(message) {
+        const success = document.createElement('div');
+        success.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+        success.textContent = message;
+        document.body.appendChild(success);
+
+        setTimeout(() => {
+            success.remove();
+        }, 5000);
+    }
+
+    hideError() {
+        const error = document.querySelector('.fixed.top-4.right-4.bg-red-500');
+        if (error) {
+            error.remove();
+        }
     }
 }
 

@@ -49,3 +49,76 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+    /* Improve touch targets */
+    button, input[type="file"], label {
+        min-height: 44px; /* iOS recommended minimum touch target */
+    }
+    
+    /* Better mobile file input styling */
+    #fileInputMobile + label {
+        transition: all 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    #fileInputMobile + label:active {
+        transform: scale(0.98);
+        background-color: #1d4ed8;
+    }
+    
+    /* Improve mobile form spacing */
+    .space-y-4 > * + * {
+        margin-top: 1rem;
+    }
+    
+    /* Better mobile button sizing */
+    .bg-blue-600 {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    /* Mobile-friendly error/success messages */
+    .fixed.top-4.right-4 {
+        left: 1rem;
+        right: 1rem;
+        top: 1rem;
+        max-width: calc(100vw - 2rem);
+    }
+}
+
+/* Drag and drop improvements */
+.dragover {
+    border-color: #3b82f6 !important;
+    background-color: #eff6ff;
+    transform: scale(1.02);
+    transition: all 0.2s ease;
+}
+
+/* File input focus states */
+input[type="file"]:focus + label {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Loading state improvements */
+.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* Success state styling */
+.success-message {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
