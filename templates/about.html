@@ -125,12 +125,29 @@
     </div>
 
     <script>
-        // Initialize reCAPTCHA
-        grecaptcha.ready(function() {
-            grecaptcha.execute('SITE_KEY', {action: 'feedback'}).then(function(token) {
-                document.getElementById('g-recaptcha-response').value = token;
-            });
-        });
+        // Initialize reCAPTCHA (optional)
+        let recaptchaAvailable = false;
+        
+        // Check if reCAPTCHA is available
+        if (typeof grecaptcha !== 'undefined') {
+            try {
+                grecaptcha.ready(function() {
+                    grecaptcha.execute('SITE_KEY', {action: 'feedback'}).then(function(token) {
+                        document.getElementById('g-recaptcha-response').value = token;
+                        recaptchaAvailable = true;
+                    }).catch(function(error) {
+                        console.log('reCAPTCHA not configured, proceeding without it');
+                        recaptchaAvailable = false;
+                    });
+                });
+            } catch (error) {
+                console.log('reCAPTCHA not available, proceeding without it');
+                recaptchaAvailable = false;
+            }
+        } else {
+            console.log('reCAPTCHA not loaded, proceeding without it');
+            recaptchaAvailable = false;
+        }
 
         // Handle form submission
         document.getElementById('feedbackForm').addEventListener('submit', async function(e) {
@@ -151,9 +168,18 @@
             try {
                 const formData = new FormData(this);
                 
-                // Refresh reCAPTCHA token
-                const token = await grecaptcha.execute('SITE_KEY', {action: 'feedback'});
-                formData.set('g-recaptcha-response', token);
+                // Try to refresh reCAPTCHA token if available
+                if (recaptchaAvailable && typeof grecaptcha !== 'undefined') {
+                    try {
+                        const token = await grecaptcha.execute('SITE_KEY', {action: 'feedback'});
+                        formData.set('g-recaptcha-response', token);
+                    } catch (error) {
+                        console.log('Failed to get reCAPTCHA token, proceeding without it');
+                        formData.set('g-recaptcha-response', '');
+                    }
+                } else {
+                    formData.set('g-recaptcha-response', '');
+                }
                 
                 const response = await fetch('/api/feedback', {
                     method: 'POST',
@@ -170,6 +196,9 @@
                     
                     // Reset form
                     this.reset();
+                    
+                    // Clear reCAPTCHA field
+                    document.getElementById('g-recaptcha-response').value = '';
                 } else {
                     // Show error message
                     document.getElementById('errorText').textContent = result.error;
@@ -177,6 +206,7 @@
                     document.getElementById('responseMessage').classList.remove('hidden');
                 }
             } catch (error) {
+                console.error('Form submission error:', error);
                 // Show error message
                 document.getElementById('errorText').textContent = 'An error occurred while submitting feedback. Please try again.';
                 document.getElementById('errorMessage').classList.remove('hidden');
