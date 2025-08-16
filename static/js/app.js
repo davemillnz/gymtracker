@@ -206,6 +206,8 @@ class GymTracker {
     displayResults(data) {
         const resultsSection = document.getElementById('resultsSection');
         const graphContainer = document.getElementById('graphContainer');
+        const prSection = document.getElementById('prSection');
+        const prContainer = document.getElementById('prContainer');
 
         // Get analysis mode display name
         const modeNames = {
@@ -228,6 +230,35 @@ class GymTracker {
                 </div>
             </div>
         `;
+
+        // Display Personal Records
+        if (data.prs && Object.keys(data.prs).length > 0) {
+            prContainer.innerHTML = `
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 class="font-semibold text-blue-900 mb-2">💪 1RM Estimate</h4>
+                    <p class="text-2xl font-bold text-blue-600">${data.prs['1rm'].value} kg</p>
+                    <p class="text-sm text-blue-700">${data.prs['1rm'].weight}kg × ${data.prs['1rm'].reps} reps</p>
+                    <p class="text-xs text-blue-600">${new Date(data.prs['1rm'].date).toLocaleDateString()}</p>
+                </div>
+                
+                <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <h4 class="font-semibold text-green-900 mb-2">🏋️ Highest Weight</h4>
+                    <p class="text-2xl font-bold text-green-600">${data.prs['highest_weight'].weight}kg × ${data.prs['highest_weight'].reps}</p>
+                    <p class="text-sm text-green-700">Best weight lifted</p>
+                    <p class="text-xs text-green-600">${new Date(data.prs['highest_weight'].date).toLocaleDateString()}</p>
+                </div>
+                
+                <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <h4 class="font-semibold text-purple-900 mb-2">📊 Highest Volume</h4>
+                    <p class="text-2xl font-bold text-purple-600">${data.prs['volume'].value} kg</p>
+                    <p class="text-sm text-purple-700">${data.prs['volume'].weight}kg × ${data.prs['volume'].reps} reps</p>
+                    <p class="text-xs text-purple-600">${new Date(data.prs['volume'].date).toLocaleDateString()}</p>
+                </div>
+            `;
+            prSection.classList.remove('hidden');
+        } else {
+            prSection.classList.add('hidden');
+        }
 
         resultsSection.classList.remove('hidden');
     }

@@ -59,6 +59,55 @@ def running_best(series):
         out.append(current)
     return out
 
+def calculate_prs(df_exercise):
+    """Calculate personal records for an exercise."""
+    if len(df_exercise) == 0:
+        return {}
+    
+    # Ensure we have valid data
+    df_valid = df_exercise[(df_exercise["Weight"] > 0) & (df_exercise["Reps"] > 0)].copy()
+    
+    if len(df_valid) == 0:
+        return {}
+    
+    # Calculate 1RM for each set
+    df_valid["1RM"] = df_valid.apply(lambda r: estimate_1rm(r["Weight"], r["Reps"]), axis=1)
+    
+    # Find highest 1RM
+    max_1rm_row = df_valid.loc[df_valid["1RM"].idxmax()]
+    pr_1rm = {
+        "value": round(max_1rm_row["1RM"], 1),
+        "weight": max_1rm_row["Weight"],
+        "reps": max_1rm_row["Reps"],
+        "date": max_1rm_row["Date"]
+    }
+    
+    # Find highest weight (prioritizing higher reps for same weight)
+    # Sort by weight descending, then by reps descending
+    df_valid_sorted = df_valid.sort_values(["Weight", "Reps"], ascending=[False, False])
+    max_weight_row = df_valid_sorted.iloc[0]
+    pr_highest_weight = {
+        "weight": max_weight_row["Weight"],
+        "reps": max_weight_row["Reps"],
+        "date": max_weight_row["Date"]
+    }
+    
+    # Find highest volume
+    df_valid["Volume"] = df_valid["Weight"] * df_valid["Reps"]
+    max_volume_row = df_valid.loc[df_valid["Volume"].idxmax()]
+    pr_volume = {
+        "value": int(max_volume_row["Volume"]),
+        "weight": max_volume_row["Weight"],
+        "reps": max_volume_row["Reps"],
+        "date": max_volume_row["Date"]
+    }
+    
+    return {
+        "1rm": pr_1rm,
+        "highest_weight": pr_highest_weight,
+        "volume": pr_volume
+    }
+
 def generate_graph_data(best, exercise_name, analysis_mode='weight'):
     """Generate graph data and create matplotlib plot."""
     # Compute value column based on analysis mode
@@ -277,8 +326,14 @@ def analyze_exercise():
         # Build best set per day
         best = best_set_per_day(df_ex)
         
+        # Calculate personal records
+        prs = calculate_prs(df_ex)
+        
         # Generate graph data
         result = generate_graph_data(best, chosen_exercise, analysis_mode)
+        
+        # Add PRs to the result
+        result["prs"] = prs
         
         return jsonify(result)
         
