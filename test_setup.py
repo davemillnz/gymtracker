@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Test script to verify the StrongLift Tracker setup.
+Test script to verify the GymTracker setup.
+This script checks if all required dependencies and files are present.
 """
 
 import sys
@@ -67,8 +68,8 @@ def test_flask_app():
         return False
 
 def main():
-    print("StrongLift Tracker Setup Test")
-    print("=" * 40)
+    print("GymTracker Setup Test")
+    print("=" * 30)
     
     imports_ok = test_imports()
     if not imports_ok:

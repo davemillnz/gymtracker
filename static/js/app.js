@@ -1,6 +1,6 @@
-// StrongLift Tracker Frontend JavaScript
+// GymTracker Frontend JavaScript
 
-class StrongLiftTracker {
+class GymTracker {
     constructor() {
         this.currentFile = null;
         this.exercises = [];
@@ -247,5 +247,5 @@ class StrongLiftTracker {
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new StrongLiftTracker();
+    new GymTracker();
 });

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting StrongLift Tracker..."
+echo "Starting GymTracker..."
 echo "Installing dependencies..."
 
 # Check if virtual environment exists

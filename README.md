@@ -1,4 +1,4 @@
-# StrongLift Tracker
+# GymTracker
 
 A modern web application for analyzing workout data exported from the Strong app. Upload your CSV export and instantly generate progress graphs and summaries for your lifts.
 
@@ -19,8 +19,8 @@ A modern web application for analyzing workout data exported from the Strong app
 
 ```bash
 # Build and run with Docker
-docker build -t stronglift-tracker .
-docker run -p 8080:8080 stronglift-tracker
+docker build -t gymtracker .
+docker run -p 8080:8080 gymtracker
 ```
 
 Then open http://localhost:8080 in your browser.

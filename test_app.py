@@ -9,7 +9,7 @@ import json
 def test_backend():
     base_url = "http://localhost:8080"
     
-    print("Testing StrongLift Tracker Backend...")
+    print("Testing GymTracker Backend...")
     print("=" * 40)
     
     # Test 1: Check if server is running
@@ -42,4 +42,5 @@ def test_backend():
     return True
 
 if __name__ == "__main__":
+    print("Testing GymTracker Backend...")
     test_backend()
