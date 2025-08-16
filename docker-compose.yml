@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  stronglift-tracker:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./templates:/app/templates
+      - ./static:/app/static
+    environment:
+      - FLASK_ENV=development
+    restart: unless-stopped

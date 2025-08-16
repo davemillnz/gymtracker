@@ -1,0 +1,238 @@
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
+import pandas as pd
+import io
+import base64
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+from datetime import datetime
+import json
+
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+def estimate_1rm(weight, reps):
+    """Epley formula for 1RM estimation."""
+    return weight * (1 + reps / 30.0)
+
+def list_exercises(df):
+    """Return list of available exercises."""
+    return sorted(df["Exercise Name"].dropna().unique().tolist())
+
+def resolve_exercise_name(df, query):
+    """Resolve exercise name with fuzzy matching."""
+    all_exercises = df["Exercise Name"].dropna().unique()
+
+    # Exact (case-insensitive)
+    exact = [ex for ex in all_exercises if ex.lower() == query.lower()]
+    if exact:
+        return exact[0]
+
+    # Partial (case-insensitive)
+    part = [ex for ex in all_exercises if query.lower() in ex.lower()]
+    if len(part) == 1:
+        return part[0]
+    if len(part) > 1:
+        return {"error": f"Multiple matches found: {', '.join(part)}"}
+    
+    return {"error": f"No matches found for '{query}'"}
+
+def best_set_per_day(df_one_ex):
+    """Return one best set per calendar day (max weight, then reps)."""
+    ranked = df_one_ex.sort_values(["Weight", "Reps"], ascending=[False, False])
+    # one row per day
+    best = ranked.groupby("Date", as_index=False).first()
+    # Ensure clean dtypes
+    best["Reps"] = best["Reps"].astype(int)
+    return best[["Date", "Weight", "Reps"]].sort_values("Date")
+
+def running_best(series):
+    """Monotonic non-decreasing running max."""
+    out = []
+    current = float("-inf")
+    for v in series:
+        current = max(current, v)
+        out.append(current)
+    return out
+
+def generate_graph_data(best, exercise_name, use_1rm=False):
+    """Generate graph data and create matplotlib plot."""
+    # Compute value column (weight or 1RM)
+    if use_1rm:
+        best["Value"] = best.apply(lambda r: estimate_1rm(r["Weight"], r["Reps"]), axis=1)
+        y_label = "1RM (kg, est.)"
+        line_label = "Session 1RM (est.)"
+    else:
+        best["Value"] = best["Weight"].astype(float)
+        y_label = "Weight (kg)"
+        line_label = "Session best weight"
+
+    # Running PR line (never down)
+    best["BestSoFar"] = running_best(best["Value"].tolist())
+
+    # Convert dates to strings for JSON serialization
+    dates = [d.isoformat() if hasattr(d, 'isoformat') else str(d) for d in best["Date"].tolist()]
+    values = best["Value"].tolist()
+    pr_line = best["BestSoFar"].tolist()
+
+    # Create matplotlib plot
+    plt.figure(figsize=(10, 6))
+    plt.plot(dates, values, marker="o", label=line_label)
+    plt.plot(dates, pr_line, linestyle="--", label="All-time best so far")
+    plt.fill_between(dates, pr_line, alpha=0.2)
+
+    title = f"Best {exercise_name} per Session" + (" (1RM est.)" if use_1rm else "")
+    plt.title(title)
+    plt.ylabel(y_label)
+    plt.xlabel("Date")
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.tight_layout()
+
+    # Convert plot to base64 string
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
+    img_buffer.seek(0)
+    img_str = base64.b64encode(img_buffer.getvalue()).decode()
+    plt.close()
+
+    return {
+        "graph_image": img_str,
+        "data": {
+            "dates": dates,
+            "values": values,
+            "pr_line": pr_line,
+            "exercise": exercise_name,
+            "use_1rm": use_1rm
+        }
+    }
+
+@app.route('/')
+def index():
+    """Serve the main page."""
+    return render_template('index.html')
+
+@app.route('/api/exercises', methods=['POST'])
+def get_exercises():
+    """Get list of available exercises from uploaded CSV."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({"error": "File must be a CSV"}), 400
+
+        # Read CSV
+        df = pd.read_csv(file)
+        
+        # Basic validation
+        required_columns = ["Date", "Exercise Name", "Weight", "Reps"]
+        if not all(col in df.columns for col in required_columns):
+            return jsonify({"error": "CSV must contain Date, Exercise Name, Weight, and Reps columns"}), 400
+
+        # Process dates
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+        df = df.dropna(subset=["Date", "Exercise Name"])
+        
+        # Valid sets only
+        df = df[(df["Weight"] > 0) & (df["Reps"] > 0)]
+        
+        exercises = list_exercises(df)
+        
+        return jsonify({
+            "exercises": exercises,
+            "total_workouts": len(df["Date"].unique()),
+            "total_sets": len(df)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Error processing file: {str(e)}"}), 500
+
+@app.route('/api/analyze', methods=['POST'])
+def analyze_exercise():
+    """Analyze a specific exercise and return graph data."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+        
+        file = request.files['file']
+        exercise_name = request.form.get('exercise', '')
+        use_1rm = request.form.get('use_1rm', 'false').lower() == 'true'
+        
+        if not exercise_name:
+            return jsonify({"error": "Exercise name is required"}), 400
+
+        # Read CSV
+        df = pd.read_csv(file)
+        
+        # Process dates
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+        df = df.dropna(subset=["Date", "Exercise Name"])
+        
+        # Valid sets only
+        df = df[(df["Weight"] > 0) & (df["Reps"] > 0)]
+        
+        # Resolve exercise name
+        resolved = resolve_exercise_name(df, exercise_name)
+        if isinstance(resolved, dict) and "error" in resolved:
+            return jsonify(resolved), 400
+        
+        chosen_exercise = resolved
+        df_ex = df[df["Exercise Name"] == chosen_exercise].copy()
+        
+        if len(df_ex) == 0:
+            return jsonify({"error": f"No data found for exercise: {chosen_exercise}"}), 400
+        
+        # Build best set per day
+        best = best_set_per_day(df_ex)
+        
+        # Generate graph data
+        result = generate_graph_data(best, chosen_exercise, use_1rm)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({"error": f"Error analyzing exercise: {str(e)}"}), 500
+
+@app.route('/api/weekly-summary', methods=['POST'])
+def weekly_summary():
+    """Generate weekly workout summary."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+        
+        file = request.files['file']
+        
+        # Read CSV
+        df = pd.read_csv(file)
+        
+        # Process dates
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+        df = df.dropna(subset=["Date", "Exercise Name"])
+        
+        # Valid sets only
+        df = df[(df["Weight"] > 0) & (df["Reps"] > 0)]
+        
+        # Group by week
+        df["Week"] = pd.to_datetime(df["Date"]).dt.isocalendar().week
+        df["Year"] = pd.to_datetime(df["Date"]).dt.isocalendar().year
+        
+        weekly_counts = df.groupby(["Year", "Week"]).size().reset_index(name="workouts")
+        weekly_counts["date_range"] = weekly_counts.apply(
+            lambda x: f"Week {x['Week']}, {x['Year']}", axis=1
+        )
+        
+        return jsonify({
+            "weekly_data": weekly_counts.to_dict('records')
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Error generating weekly summary: {str(e)}"}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=8080)
