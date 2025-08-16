@@ -8,6 +8,9 @@ matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 from datetime import datetime
 import json
+import os
+import tempfile
+import requests
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -112,6 +115,60 @@ def generate_graph_data(best, exercise_name, use_1rm=False):
 def index():
     """Serve the main page."""
     return render_template('index.html')
+
+@app.route('/about')
+def about():
+    """Serve the about page."""
+    return render_template('about.html')
+
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    """Handle feedback submission and CSV upload."""
+    try:
+        # Verify reCAPTCHA
+        recaptcha_response = request.form.get('g-recaptcha-response')
+        if not recaptcha_response:
+            return jsonify({"error": "reCAPTCHA verification required"}), 400
+        
+        # Get reCAPTCHA secret from environment
+        recaptcha_secret = os.environ.get('RECAPTCHA_SECRET')
+        if not recaptcha_secret:
+            return jsonify({"error": "reCAPTCHA configuration error"}), 500
+        
+        # Verify reCAPTCHA with Google
+        verify_url = "https://www.google.com/recaptcha/api/siteverify"
+        verify_data = {
+            'secret': recaptcha_secret,
+            'response': recaptcha_response
+        }
+        
+        verify_response = requests.post(verify_url, data=verify_data)
+        verify_result = verify_response.json()
+        
+        if not verify_result.get('success', False):
+            return jsonify({"error": "reCAPTCHA verification failed"}), 400
+        
+        # Process feedback text
+        feedback_message = request.form.get('message', '').strip()
+        if feedback_message:
+            print(f"User Feedback: {feedback_message}")
+        
+        # Process CSV file upload
+        if 'file' in request.files:
+            file = request.files['file']
+            if file.filename != '' and file.filename.endswith('.csv'):
+                # Save to temp directory
+                temp_dir = tempfile.gettempdir()
+                temp_filename = f"feedback_csv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                temp_path = os.path.join(temp_dir, temp_filename)
+                
+                file.save(temp_path)
+                print(f"CSV file uploaded and saved to: {temp_path}")
+        
+        return jsonify({"message": "Thanks for your feedback!"})
+        
+    except Exception as e:
+        return jsonify({"error": f"Error processing feedback: {str(e)}"}), 500
 
 @app.route('/api/exercises', methods=['POST'])
 def get_exercises():

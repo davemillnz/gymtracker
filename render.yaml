@@ -1,0 +1,11 @@
+# render.yaml
+services:
+  - type: web
+    name: gymtracker
+    env: python
+    plan: free
+    buildCommand: "./install.sh"
+    startCommand: "gunicorn -w 4 -b 0.0.0.0:8000 app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
